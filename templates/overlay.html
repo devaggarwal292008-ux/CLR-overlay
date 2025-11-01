@@ -1,76 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Transcending Void Overlay</title>
-<style>
-body {
-  margin: 0;
-  overflow: hidden;
-  background: url("/static/assets/CLR overlay.webp") no-repeat center center;
-  background-size: cover;
-  color: white;
-  font-family: 'Brawl Stars', sans-serif;
-}
+  <meta charset="UTF-8">
+  <title>Transcending Void Overlay</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: url("/static/assets/CLR overlay.webp") no-repeat center center;
+      background-size: cover;
+      color: white;
+      font-family: 'Brawl Stars', sans-serif;
+    }
 
-#content {
-  position: absolute;
-  top: 10%;
-  left: 5%;
-}
+    #overlay-container {
+      position: absolute;
+      top: 5%;
+      left: 5%;
+      width: 90%;
+      height: 90%;
+    }
 
-.team {
-  font-size: 32px;
-  font-weight: bold;
-  margin-bottom: 10px;
-}
+    #map {
+      text-align: center;
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
 
-.player {
-  font-size: 20px;
-  margin-left: 10px;
-}
+    .teams {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
 
-.brawler {
-  width: 64px;
-  height: 64px;
-  margin: 4px;
-}
-</style>
+    .team {
+      width: 45%;
+    }
+
+    .team-name {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px #000;
+    }
+
+    .player {
+      font-size: 18px;
+      margin-left: 15px;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    #bans, #picks {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    h3 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px #000;
+    }
+
+    .brawler {
+      width: 64px;
+      height: 64px;
+      margin: 4px;
+      border-radius: 10px;
+    }
+  </style>
 </head>
 <body>
-  <div id="content">
-    <div id="map"></div>
+  <div id="overlay-container">
+    <div id="map">Loading map...</div>
     <div id="teams"></div>
     <div id="bans"></div>
     <div id="picks"></div>
   </div>
 
-<script>
-async function updateOverlay() {
-  try {
-    const res = await fetch("/data");
-    const data = await res.json();
+  <script>
+    // Helper: extract URL parameters
+    function getQueryParam(key) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(key);
+    }
 
-    document.getElementById("map").innerHTML = `<h2>${data.map.name}</h2>`;
-    
-    document.getElementById("teams").innerHTML = data.teams.map(t =>
-      `<div class="team">${t.name}<div>${t.players.map(p => `<div class="player">${p}</div>`).join('')}</div></div>`
-    ).join('');
+    async function updateOverlay() {
+      try {
+        const bountyId = getQueryParam("bountyId");
+        const matchId = getQueryParam("matchId");
+        const url = bountyId && matchId ? `/data?bountyId=${bountyId}&matchId=${matchId}` : "/data";
 
-    document.getElementById("bans").innerHTML = "<h3>Bans:</h3>" + data.bans.map(b =>
-      `<img class="brawler" src="https://cdn.brawlify.com/brawlers/${b}.png">`
-    ).join('');
+        const res = await fetch(url);
+        const data = await res.json();
 
-    document.getElementById("picks").innerHTML = "<h3>Picks:</h3>" + data.picks.map(b =>
-      `<img class="brawler" src="https://cdn.brawlify.com/brawlers/${b}.png">`
-    ).join('');
-  } catch (err) {
-    console.error(err);
-  }
-}
+        // Handle missing data
+        if (data.error) {
+          document.getElementById("map").innerHTML = `<span style="color:red;">${data.error}</span>`;
+          return;
+        }
 
-setInterval(updateOverlay, 5000);
-updateOverlay();
-</script>
+        // Map
+        document.getElementById("map").innerHTML = `<h2>${data.map?.name || "Unknown Map"}</h2>`;
+
+        // Teams
+        document.getElementById("teams").innerHTML = `
+          <div class="teams">
+            ${data.teams.map(t => `
+              <div class="team">
+                <div class="team-name">${t.name || "Unknown Team"}</div>
+                ${t.players.map(p => `<div class="player">${p}</div>`).join('')}
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        // Bans
+        document.getElementById("bans").innerHTML = `
+          <h3>Bans</h3>
+          ${data.bans.map(b => `
+            <img class="brawler" src="https://cdn.brawlify.com/brawlers/${b.toLowerCase()}.png" alt="${b}">
+          `).join('')}
+        `;
+
+        // Picks
+        document.getElementById("picks").innerHTML = `
+          <h3>Picks</h3>
+          ${data.picks.map(b => `
+            <img class="brawler" src="https://cdn.brawlify.com/brawlers/${b.toLowerCase()}.png" alt="${b}">
+          `).join('')}
+        `;
+
+      } catch (err) {
+        console.error("Overlay update failed:", err);
+        document.getElementById("map").innerHTML = `<span style="color:red;">Overlay error</span>`;
+      }
+    }
+
+    setInterval(updateOverlay, 5000);
+    updateOverlay();
+  </script>
 </body>
 </html>
+
