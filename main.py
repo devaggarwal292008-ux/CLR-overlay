@@ -64,21 +64,27 @@ def draft_state():
 # --- Overlay data API ---
 @app.route('/data')
 def data():
+    # Try from memory first
     bounty_id = current_data.get("bounty_id")
     match_id = current_data.get("match_id")
 
+    # If not set in memory, try reading from query params
+    bounty_id = bounty_id or request.args.get("bountyId")
+    match_id = match_id or request.args.get("matchId")
+
     if not bounty_id or not match_id:
-        return jsonify({"error": "No match set"}), 400
+        return jsonify({"error": "No match set or missing parameters"}), 400
 
     try:
         url = f"{MATCHERINO_API}/{bounty_id}/matches/{match_id}"
-        match_resp = requests.get(url)
+        headers = {"User-Agent": "Mozilla/5.0"}
+        match_resp = requests.get(url, headers=headers)
         match_resp.raise_for_status()
         match_data = match_resp.json()
     except Exception as e:
         return jsonify({"error": f"Failed to fetch match data: {str(e)}"}), 400
 
-    # Extract team and player info
+    # Extract teams
     teams = []
     for team in match_data.get("teams", []):
         teams.append({
@@ -89,8 +95,8 @@ def data():
     bans = ["Crow", "Fang"]
     picks = ["Gus", "Max", "Poco"]
 
+    # Map info
     map_name = match_data.get("map", "Hard Rock Mine")
-
     try:
         maps_resp = requests.get(BRAWLIFY_API)
         maps_resp.raise_for_status()
@@ -99,7 +105,10 @@ def data():
     except Exception:
         map_data = {"name": map_name}
 
+    # Update memory cache
     current_data.update({
+        "bounty_id": bounty_id,
+        "match_id": match_id,
         "teams": teams,
         "map": map_data,
         "bans": bans,
@@ -112,3 +121,4 @@ def data():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
