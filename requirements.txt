@@ -4,3 +4,5 @@ requests
 jinja2
 python-multipart
 aiofiles
+Flask==3.0.3
+requests==2.32.3
