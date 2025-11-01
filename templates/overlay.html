@@ -2,144 +2,116 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Transcending Void Overlay</title>
+  <title>CLR Overlay Draft Test</title>
   <style>
     body {
-      margin: 0;
-      overflow: hidden;
-      background: url("/static/assets/CLR overlay.webp") no-repeat center center;
-      background-size: cover;
-      color: white;
-      font-family: 'Brawl Stars', sans-serif;
-    }
-
-    #overlay-container {
-      position: absolute;
-      top: 5%;
-      left: 5%;
-      width: 90%;
-      height: 90%;
-    }
-
-    #map {
-      text-align: center;
-      font-size: 32px;
-      font-weight: bold;
-      margin-bottom: 20px;
-    }
-
-    .teams {
+      background: #002244;
+      color: #fff;
+      font-family: sans-serif;
       display: flex;
-      justify-content: space-between;
-      margin-bottom: 20px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
     }
-
+    .draft-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 60px;
+    }
     .team {
-      width: 45%;
-    }
-
-    .team-name {
-      font-size: 28px;
-      font-weight: bold;
-      margin-bottom: 10px;
-      text-shadow: 2px 2px 4px #000;
-    }
-
-    .player {
-      font-size: 18px;
-      margin-left: 15px;
-      text-shadow: 1px 1px 2px #000;
-    }
-
-    #bans, #picks {
       text-align: center;
-      margin-top: 20px;
     }
-
-    h3 {
-      font-size: 24px;
-      margin-bottom: 10px;
-      text-shadow: 2px 2px 4px #000;
-    }
-
     .brawler {
-      width: 64px;
-      height: 64px;
-      margin: 4px;
+      width: 80px;
+      height: 80px;
+      margin: 5px;
       border-radius: 10px;
+      background: #222;
+      display: inline-block;
+      background-size: cover;
+      background-position: center;
+    }
+    h2 {
+      margin-bottom: 10px;
+    }
+    #map-name {
+      font-size: 24px;
+      margin-top: 20px;
+      color: #ffcc00;
     }
   </style>
 </head>
 <body>
-  <div id="overlay-container">
-    <div id="map">Loading map...</div>
-    <div id="teams"></div>
-    <div id="bans"></div>
-    <div id="picks"></div>
+  <h1>Transcending Void Draft Overlay Test</h1>
+  <div id="map-name"></div>
+  <div class="draft-container">
+    <div class="team" id="teamA">
+      <h2 id="teamAName">Team A</h2>
+      <div id="teamABans"></div>
+      <div id="teamAPicks"></div>
+    </div>
+    <div class="team" id="teamB">
+      <h2 id="teamBName">Team B</h2>
+      <div id="teamBBans"></div>
+      <div id="teamBPicks"></div>
+    </div>
   </div>
 
   <script>
-    // Helper: extract URL parameters
-    function getQueryParam(key) {
-      const params = new URLSearchParams(window.location.search);
-      return params.get(key);
-    }
+    const bountyId = new URLSearchParams(window.location.search).get("bountyId");
+    const matchId = new URLSearchParams(window.location.search).get("matchId");
 
-    async function updateOverlay() {
-      try {
-        const bountyId = getQueryParam("bountyId");
-        const matchId = getQueryParam("matchId");
-        const url = bountyId && matchId ? `/data?bountyId=${bountyId}&matchId=${matchId}` : "/data";
+    async function loadOverlay() {
+      const res = await fetch(`/data?bountyId=${bountyId}&matchId=${matchId}`);
+      const data = await res.json();
 
-        const res = await fetch(url);
-        const data = await res.json();
-
-        // Handle missing data
-        if (data.error) {
-          document.getElementById("map").innerHTML = `<span style="color:red;">${data.error}</span>`;
-          return;
-        }
-
-        // Map
-        document.getElementById("map").innerHTML = `<h2>${data.map?.name || "Unknown Map"}</h2>`;
-
-        // Teams
-        document.getElementById("teams").innerHTML = `
-          <div class="teams">
-            ${data.teams.map(t => `
-              <div class="team">
-                <div class="team-name">${t.name || "Unknown Team"}</div>
-                ${t.players.map(p => `<div class="player">${p}</div>`).join('')}
-              </div>
-            `).join('')}
-          </div>
-        `;
-
-        // Bans
-        document.getElementById("bans").innerHTML = `
-          <h3>Bans</h3>
-          ${data.bans.map(b => `
-            <img class="brawler" src="https://cdn.brawlify.com/brawlers/${b.toLowerCase()}.png" alt="${b}">
-          `).join('')}
-        `;
-
-        // Picks
-        document.getElementById("picks").innerHTML = `
-          <h3>Picks</h3>
-          ${data.picks.map(b => `
-            <img class="brawler" src="https://cdn.brawlify.com/brawlers/${b.toLowerCase()}.png" alt="${b}">
-          `).join('')}
-        `;
-
-      } catch (err) {
-        console.error("Overlay update failed:", err);
-        document.getElementById("map").innerHTML = `<span style="color:red;">Overlay error</span>`;
+      if (data.error) {
+        document.body.innerHTML = `<h1>⚠️ ${data.error}</h1>`;
+        return;
       }
+
+      const match = data.body?.matches?.[0];
+      if (!match) {
+        document.body.innerHTML = `<h1>No match data found</h1>`;
+        return;
+      }
+
+      document.getElementById("map-name").innerText = match.map?.name || "Unknown Map";
+      document.getElementById("teamAName").innerText = match.entrantA?.name || "Team A";
+      document.getElementById("teamBName").innerText = match.entrantB?.name || "Team B";
+
+      renderDraft(match.entrantA, "A");
+      renderDraft(match.entrantB, "B");
     }
 
-    setInterval(updateOverlay, 5000);
-    updateOverlay();
+    function renderDraft(team, side) {
+      const bans = team.bans || [];
+      const picks = team.picks || [];
+
+      const bansContainer = document.getElementById(`team${side}Bans`);
+      const picksContainer = document.getElementById(`team${side}Picks`);
+
+      bans.forEach(b => {
+        const el = document.createElement("div");
+        el.className = "brawler";
+        el.style.backgroundImage = `url(${b.brawler?.imageUrl || ""})`;
+        bansContainer.appendChild(el);
+      });
+
+      picks.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "brawler";
+        el.style.backgroundImage = `url(${p.brawler?.imageUrl || ""})`;
+        picksContainer.appendChild(el);
+      });
+    }
+
+    loadOverlay();
   </script>
 </body>
 </html>
+
 
