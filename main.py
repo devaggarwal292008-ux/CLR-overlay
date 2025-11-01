@@ -7,7 +7,7 @@ app = Flask(__name__)
 MATCHERINO_API = "https://matcherino.com/__api/bounties"
 BRAWLIFY_API = "https://api.brawlapi.com/v1/maps"
 
-# Temporary storage (can be replaced by a database or control panel later)
+# In-memory storage
 current_data = {
     "bounty_id": None,
     "match_id": None,
@@ -23,10 +23,20 @@ def index():
     return "✅ Transcending Void Overlay API is running!"
 
 
-# --- Set the current match (POST via control panel or API call) ---
+# --- CONTROL PANEL PAGE ---
+@app.route('/control')
+def control_panel():
+    return render_template("control.html")
+
+
+# --- Set current match (handles HTML form + JSON) ---
 @app.route('/set_match', methods=['POST'])
 def set_match():
-    data = request.get_json()
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form  # form data from control.html
+
     bounty_id = data.get("bounty_id")
     match_id = data.get("match_id")
 
@@ -39,13 +49,19 @@ def set_match():
     return jsonify({"status": "Match IDs updated successfully"}), 200
 
 
-# --- Serve overlay page (used in OBS Browser Source) ---
+# --- Serve overlay for OBS ---
 @app.route('/overlay')
 def overlay():
     return render_template("overlay.html")
 
 
-# --- Dynamic data API for the overlay ---
+# --- API that control panel polls ---
+@app.route('/draft')
+def draft_state():
+    return jsonify(current_data)
+
+
+# --- Overlay data API ---
 @app.route('/data')
 def data():
     bounty_id = current_data.get("bounty_id")
@@ -55,7 +71,6 @@ def data():
         return jsonify({"error": "No match set"}), 400
 
     try:
-        # Fetch match data from Matcherino
         url = f"{MATCHERINO_API}/{bounty_id}/matches/{match_id}"
         match_resp = requests.get(url)
         match_resp.raise_for_status()
@@ -71,11 +86,9 @@ def data():
             "players": [p.get("username", "Unknown") for p in team.get("players", [])]
         })
 
-    # Example bans/picks (replace later if your API gives this)
     bans = ["Crow", "Fang"]
     picks = ["Gus", "Max", "Poco"]
 
-    # Map info (fallback to default)
     map_name = match_data.get("map", "Hard Rock Mine")
 
     try:
@@ -96,7 +109,6 @@ def data():
     return jsonify(current_data)
 
 
-# --- Run server locally or on Render ---
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
