@@ -4,10 +4,10 @@ import os
 
 app = Flask(__name__)
 
-MATCHERINO_API = "https://matcherino.com/__api/bounties/"
-BRAWLIFY_API = "https://api.brawlapi.com/v1"
+MATCHERINO_API = "https://matcherino.com/__api/bounties"
+BRAWLIFY_API = "https://api.brawlapi.com/v1/maps"
 
-# Temporary storage (until we add a proper control panel)
+# Temporary storage (can be replaced by a database or control panel later)
 current_data = {
     "bounty_id": None,
     "match_id": None,
@@ -17,21 +17,35 @@ current_data = {
     "picks": []
 }
 
+
 @app.route('/')
 def index():
-    return "Transcending Void Overlay API running!"
+    return "✅ Transcending Void Overlay API is running!"
 
+
+# --- Set the current match (POST via control panel or API call) ---
 @app.route('/set_match', methods=['POST'])
 def set_match():
-    data = request.json
-    current_data["bounty_id"] = data.get("bounty_id")
-    current_data["match_id"] = data.get("match_id")
-    return jsonify({"status": "Match IDs updated"}), 200
+    data = request.get_json()
+    bounty_id = data.get("bounty_id")
+    match_id = data.get("match_id")
 
+    if not bounty_id or not match_id:
+        return jsonify({"error": "Missing bounty_id or match_id"}), 400
+
+    current_data["bounty_id"] = bounty_id
+    current_data["match_id"] = match_id
+
+    return jsonify({"status": "Match IDs updated successfully"}), 200
+
+
+# --- Serve overlay page (used in OBS Browser Source) ---
 @app.route('/overlay')
 def overlay():
     return render_template("overlay.html")
 
+
+# --- Dynamic data API for the overlay ---
 @app.route('/data')
 def data():
     bounty_id = current_data.get("bounty_id")
@@ -40,40 +54,49 @@ def data():
     if not bounty_id or not match_id:
         return jsonify({"error": "No match set"}), 400
 
-    # Fetch match data from Matcherino
-    url = f"{MATCHERINO_API}{bounty_id}/matches/{match_id}"
-    resp = requests.get(url)
-    if resp.status_code != 200:
-        return jsonify({"error": "Could not fetch match data"}), 400
+    try:
+        # Fetch match data from Matcherino
+        url = f"{MATCHERINO_API}/{bounty_id}/matches/{match_id}"
+        match_resp = requests.get(url)
+        match_resp.raise_for_status()
+        match_data = match_resp.json()
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch match data: {str(e)}"}), 400
 
-    match_data = resp.json()
-
-    # Parse teams, players, bans, etc.
+    # Extract team and player info
     teams = []
     for team in match_data.get("teams", []):
         teams.append({
-            "name": team.get("name"),
-            "players": [p.get("username") for p in team.get("players", [])]
+            "name": team.get("name", "Unknown Team"),
+            "players": [p.get("username", "Unknown") for p in team.get("players", [])]
         })
 
-    # Example static data (replace with real once Matcherino integration known)
-    bans = ["crow", "fang"]
-    picks = ["gus", "max", "poco"]
+    # Example bans/picks (replace later if your API gives this)
+    bans = ["Crow", "Fang"]
+    picks = ["Gus", "Max", "Poco"]
 
+    # Map info (fallback to default)
     map_name = match_data.get("map", "Hard Rock Mine")
 
-    # Fetch map info from Brawlify
-    map_resp = requests.get(f"{BRAWLIFY_API}/maps")
-    map_data = next((m for m in map_resp.json() if m["name"].lower() == map_name.lower()), None)
+    try:
+        maps_resp = requests.get(BRAWLIFY_API)
+        maps_resp.raise_for_status()
+        maps_list = maps_resp.json()
+        map_data = next((m for m in maps_list if m["name"].lower() == map_name.lower()), {"name": map_name})
+    except Exception:
+        map_data = {"name": map_name}
 
     current_data.update({
         "teams": teams,
-        "map": map_data or {"name": map_name},
+        "map": map_data,
         "bans": bans,
         "picks": picks
     })
 
     return jsonify(current_data)
 
+
+# --- Run server locally or on Render ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
