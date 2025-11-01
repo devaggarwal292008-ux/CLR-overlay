@@ -1,0 +1,31 @@
+<!-- static/control.html -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Draft Control</title>
+<style>body{font-family:sans-serif;background:#071020;color:#e6eef6;padding:18px}label{display:block;margin-top:10px;color:#9fb0c8}input{padding:8px;width:300px;margin-top:6px;border-radius:6px;border:1px solid #213246;background:#071020;color:#e6eef6}button{margin-top:12px;padding:10px 14px;border-radius:6px;border:none;background:#1f8cff;color:#fff}</style></head>
+<body>
+  <h2>Draft Control</h2>
+  <form method="post" action="/set_match">
+    <label>Bounty ID (tournament)</label><input name="bounty_id" placeholder="170310" required>
+    <label>Match ID</label><input name="match_id" placeholder="116372636" required>
+    <label>Secret (if configured)</label><input name="secret" placeholder="optional secret">
+    <br><button type="submit">Set Active Match</button>
+  </form>
+  <p style="color:#9fb0c8;margin-top:14px">After set: open <code>/overlay</code> in OBS as Browser Source.</p>
+  <hr/>
+  <div style="margin-top:10px;color:#9fb0c8">
+    <strong>Current state:</strong>
+    <pre id="state">loading...</pre>
+  </div>
+
+<script>
+async function refreshState(){
+  const res = await fetch('/draft');
+  const data = await res.json();
+  document.getElementById('state').innerText = JSON.stringify(data, null, 2);
+}
+refreshState();
+setInterval(refreshState, 3000);
+</script>
+</body>
+</html>
